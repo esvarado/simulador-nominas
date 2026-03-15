@@ -26,34 +26,50 @@ def eur(x: float) -> str:
 
 
 def input_conectado(label, min_value, max_value, value, step, key_base):
-    if key_base not in st.session_state:
-        st.session_state[key_base] = float(value)
+    main_key = key_base
+    slider_key = f"{key_base}_slider"
+    number_key = f"{key_base}_number"
+
+    if main_key not in st.session_state:
+        st.session_state[main_key] = float(value)
+
+    if slider_key not in st.session_state:
+        st.session_state[slider_key] = float(st.session_state[main_key])
+
+    if number_key not in st.session_state:
+        st.session_state[number_key] = float(st.session_state[main_key])
+
+    def update_from_slider():
+        st.session_state[main_key] = float(st.session_state[slider_key])
+        st.session_state[number_key] = float(st.session_state[main_key])
+
+    def update_from_number():
+        st.session_state[main_key] = float(st.session_state[number_key])
+        st.session_state[slider_key] = float(st.session_state[main_key])
 
     col1, col2 = st.columns([3, 2])
 
     with col1:
-        slider_value = st.slider(
+        st.slider(
             f"{label} (slider)",
             min_value=min_value,
             max_value=max_value,
-            value=float(st.session_state[key_base]),
             step=step,
-            key=f"{key_base}_slider",
+            key=slider_key,
+            on_change=update_from_slider,
         )
 
     with col2:
-        number_value = st.number_input(
+        st.number_input(
             f"{label} (valor)",
             min_value=min_value,
             max_value=max_value,
-            value=float(slider_value),
             step=step,
-            key=f"{key_base}_number",
+            key=number_key,
+            on_change=update_from_number,
         )
 
-    st.session_state[key_base] = float(number_value)
-    return float(number_value)
-
+    return float(st.session_state[main_key])
 
 def aplicar_tramos(base, brackets):
     if base <= 0:
