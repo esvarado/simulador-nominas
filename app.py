@@ -26,19 +26,37 @@ def eur(x: float) -> str:
 
 
 def input_conectado(label, min_value, max_value, value, step, key_base):
+    main_key = key_base
+    slider_key = f"{key_base}_slider"
+    number_key = f"{key_base}_number"
 
-    if key_base not in st.session_state:
-        st.session_state[key_base] = float(value)
+    if main_key not in st.session_state:
+        st.session_state[main_key] = float(value)
+
+    if slider_key not in st.session_state:
+        st.session_state[slider_key] = float(st.session_state[main_key])
+
+    if number_key not in st.session_state:
+        st.session_state[number_key] = float(st.session_state[main_key])
+
+    def update_from_slider():
+        st.session_state[main_key] = float(st.session_state[slider_key])
+        st.session_state[number_key] = float(st.session_state[main_key])
+
+    def update_from_number():
+        st.session_state[main_key] = float(st.session_state[number_key])
+        st.session_state[slider_key] = float(st.session_state[main_key])
 
     col1, col2 = st.columns([3, 2])
 
     with col1:
         st.slider(
-            f"{label}",
+            label,
             min_value=min_value,
             max_value=max_value,
             step=step,
-            key=key_base,
+            key=slider_key,
+            on_change=update_from_slider,
         )
 
     with col2:
@@ -47,149 +65,11 @@ def input_conectado(label, min_value, max_value, value, step, key_base):
             min_value=min_value,
             max_value=max_value,
             step=step,
-            key=key_base,
+            key=number_key,
+            on_change=update_from_number,
         )
 
-    return float(st.session_state[key_base])
-
-
-def cuota_irpf_madrid_simplificada(base_liquidable_general, minimo_personal=5550.0):
-    tramos = [
-        (12450.0, 0.19),
-        (20200.0, 0.24),
-        (35200.0, 0.30),
-        (60000.0, 0.37),
-        (300000.0, 0.45),
-        (None, 0.47),
-    ]
-    cuota_base = aplicar_tramos(max(0.0, base_liquidable_general), tramos)
-    cuota_minimo = aplicar_tramos(max(0.0, minimo_personal), tramos)
-    return max(0.0, cuota_base - cuota_minimo)
-
-
-def reduccion_rendimientos_trabajo(rnt):
-    if rnt <= 14852:
-        return 7302.0
-    if rnt < 19747.5:
-        return max(0.0, 7302.0 - 1.75 * (rnt - 14852.0))
-    return 0.0
-
-
-def calcular_nomina(
-    salario_base,
-    complemento_personal,
-    complemento_puesto,
-    plus_transporte,
-    plus_convenio,
-    horas_extra,
-    precio_hora_extra,
-    pagas_ano,
-    prorrata_extras,
-    irpf_pct,
-    cot_cc_pct,
-    cot_desempleo_pct,
-    cot_formacion_pct,
-    emp_cc_pct,
-    emp_desempleo_pct,
-    emp_formacion_pct,
-    emp_fogasa_pct,
-    emp_at_ep_pct,
-):
-    complementos_salariales = complemento_personal + complemento_puesto + plus_convenio
-    importe_horas_extra = horas_extra * precio_hora_extra
-
-    devengo_ordinario = salario_base + complementos_salariales + plus_transporte + importe_horas_extra
-    base_extra = salario_base + complementos_salariales
-
-    if pagas_ano == 14:
-        num_extras = 2
-    else:
-        num_extras = max(pagas_ano - 12, 0)
-
-    # Prorrata que afecta al cobro mensual
-    if prorrata_extras and num_extras > 0:
-        prorrata_mensual = (base_extra * num_extras) / 12
-    else:
-        prorrata_mensual = 0.0
-
-    total_devengado = devengo_ordinario + prorrata_mensual
-
-    # Base de cotización correcta según número de pagas
-    base_salarial = salario_base + complementos_salariales
-
-    if pagas_ano == 14 and not prorrata_extras:
-        # La Seguridad Social prorratea las extras en la base mensual
-        base_cotizacion = (base_salarial * 14 / 12) + importe_horas_extra
-    else:
-        # 12 pagas o 14 con prorrata
-        base_cotizacion = base_salarial + prorrata_mensual + importe_horas_extra
-
-    # Deducciones trabajador
-    cuota_cc = base_cotizacion * cot_cc_pct / 100
-    cuota_desempleo = base_cotizacion * cot_desempleo_pct / 100
-    cuota_formacion = base_cotizacion * cot_formacion_pct / 100
-    irpf = total_devengado * irpf_pct / 100
-
-    total_deducciones = cuota_cc + cuota_desempleo + cuota_formacion + irpf
-    neto = total_devengado - total_deducciones
-
-    # Cotizaciones empresa
-    emp_cc = base_cotizacion * emp_cc_pct / 100
-    emp_desempleo = base_cotizacion * emp_desempleo_pct / 100
-    emp_formacion = base_cotizacion * emp_formacion_pct / 100
-    emp_fogasa = base_cotizacion * emp_fogasa_pct / 100
-    emp_at_ep = base_cotizacion * emp_at_ep_pct / 100
-
-    total_cot_empresa = emp_cc + emp_desempleo + emp_formacion + emp_fogasa + emp_at_ep
-    coste_empresa = total_devengado + total_cot_empresa
-
-    # Bruto anual
-    if pagas_ano == 12:
-        bruto_anual = total_devengado * 12
-    else:
-        if prorrata_extras:
-            bruto_anual = total_devengado * 12
-        else:
-            bruto_anual = devengo_ordinario * 12 + base_extra * num_extras
-
-    # Neto anual estimado
-    if pagas_ano == 12 or prorrata_extras:
-        neto_anual_estimado = neto * 12
-    else:
-        neto_anual_estimado = (neto * 12) + (base_extra * num_extras * (1 - irpf_pct / 100))
-
-    return {
-        "salario_base": salario_base,
-        "complemento_personal": complemento_personal,
-        "complemento_puesto": complemento_puesto,
-        "plus_convenio": plus_convenio,
-        "plus_transporte": plus_transporte,
-        "horas_extra": horas_extra,
-        "precio_hora_extra": precio_hora_extra,
-        "importe_horas_extra": importe_horas_extra,
-        "prorrata_mensual": prorrata_mensual,
-        "total_devengado": total_devengado,
-        "base_cotizacion": base_cotizacion,
-        "cuota_cc": cuota_cc,
-        "cuota_desempleo": cuota_desempleo,
-        "cuota_formacion": cuota_formacion,
-        "irpf": irpf,
-        "total_deducciones": total_deducciones,
-        "neto": neto,
-        "emp_cc": emp_cc,
-        "emp_desempleo": emp_desempleo,
-        "emp_formacion": emp_formacion,
-        "emp_fogasa": emp_fogasa,
-        "emp_at_ep": emp_at_ep,
-        "total_cot_empresa": total_cot_empresa,
-        "coste_empresa": coste_empresa,
-        "bruto_anual": bruto_anual,
-        "neto_anual_estimado": neto_anual_estimado,
-        "num_extras": num_extras,
-        "pagas_ano": pagas_ano,
-        "prorrata_extras": prorrata_extras,
-        "irpf_pct": irpf_pct,
-    }
+    return float(st.session_state[main_key])
 
 def calcular_retribucion_flexible_madrid(
     bruto_anual,
