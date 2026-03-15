@@ -26,58 +26,31 @@ def eur(x: float) -> str:
 
 
 def input_conectado(label, min_value, max_value, value, step, key_base):
+
     if key_base not in st.session_state:
         st.session_state[key_base] = float(value)
 
     col1, col2 = st.columns([3, 2])
 
     with col1:
-        slider_value = st.slider(
-            f"{label} (slider)",
+        st.slider(
+            f"{label}",
             min_value=min_value,
             max_value=max_value,
-            value=float(st.session_state[key_base]),
             step=step,
-            key=f"{key_base}_slider",
+            key=key_base,
         )
 
     with col2:
-        number_value = st.number_input(
-            f"{label} (valor)",
+        st.number_input(
+            f"{label} (€)",
             min_value=min_value,
             max_value=max_value,
-            value=float(slider_value),
             step=step,
-            key=f"{key_base}_number",
+            key=key_base,
         )
 
-    st.session_state[key_base] = float(number_value)
-    return float(number_value)
-
-
-def aplicar_tramos(base, brackets):
-    if base <= 0:
-        return 0.0
-
-    cuota = 0.0
-    resto = base
-    limite_anterior = 0.0
-
-    for limite, tipo in brackets:
-        if limite is None:
-            cuota += max(0.0, resto) * tipo
-            break
-
-        tramo = min(resto, limite - limite_anterior)
-        if tramo > 0:
-            cuota += tramo * tipo
-            resto -= tramo
-
-        limite_anterior = limite
-        if resto <= 0:
-            break
-
-    return cuota
+    return float(st.session_state[key_base])
 
 
 def cuota_irpf_madrid_simplificada(base_liquidable_general, minimo_personal=5550.0):
